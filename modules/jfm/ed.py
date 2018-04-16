@@ -6,7 +6,16 @@ class fileeditor:
         self.contents = list()
         if filename is not None:
             self.load(filename)
-
+    def help(self):
+	print('''__init__(self, filename = None):
+	      load(self, filename):
+	      def save(self):
+	      def print(self):
+	      def append(self, line):
+	      def insert(self, location, lines):
+	      def strike(self, line)
+	      ''')
+	      
     def load(self, filename):
         self.filename = filename
 	cnt = 0
