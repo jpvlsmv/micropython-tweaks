@@ -6,8 +6,8 @@ echo = Pin(4,Pin.IN)
 def sr04_irq(p):
     global lastup
     now = utime.ticks_us()
-    flags = p.irq().flags()
-    if flags & Pin.IRQ_RISING:
+    if p.value() != 0:
+        #Risen edge
         lastup = now
     else:
         print(utime.ticks_diff(now,lastup))
