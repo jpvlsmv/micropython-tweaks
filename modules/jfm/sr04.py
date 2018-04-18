@@ -17,11 +17,17 @@ class sr04:
         self.trig.value(1)
         usleep_ms(1) # FIXME: should be nonblocking
         self.trig.value(0)
+    def get(self):
+        while self.mailslot == 0:
+            usleep_ms(1)
+        return self.mailslot
+
 
     def sr04_irq(p):
         now = utime.ticks_us()
         if p.value() != 0:
             # edge has risen, start the clock
+            self.mailslot=0
             self.lastup = now
         else
             self.mailslot = utime.ticks_diff(now, self.lastup)
