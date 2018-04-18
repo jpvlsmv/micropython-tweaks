@@ -1,5 +1,32 @@
+#!/usr/bin/env micropython
 import utime
 from machine import Pin
+
+class sr04:
+    def __init__(self, trig=None, echo=None, enable=False):
+        '''Connect trig=machine.Pin(#) to SR-04 trigger and echo to SR-04 echo'''
+        self.trig = trig
+        self.echo = echo
+    def enable(self):
+        self.mailslot=0
+        self.echo.irq(trigger=Pin.IRQ_RISING|Pin.IRQ_FALLING, handler=self.sr04_irq)
+    def disable(self):
+        self.echo.irq(handler = None)
+        self.mailslot=0
+    def trigger(self):
+        self.trig.value(1)
+        usleep_ms(1) # FIXME: should be nonblocking
+        self.trig.value(0)
+
+    def sr04_irq(p):
+        now = utime.ticks_us()
+        if p.value() != 0:
+            # edge has risen, start the clock
+            self.lastup = now
+        else
+            self.mailslot = utime.ticks_diff(now, self.lastup)
+
+
 lastup=utime.ticks_us()
 trig = Pin(5,Pin.OUT)
 echo = Pin(4,Pin.IN)
