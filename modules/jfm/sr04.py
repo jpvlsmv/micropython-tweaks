@@ -4,7 +4,7 @@ from machine import Pin
 
 class sr04:
     def __init__(self, trig=None, echo=None, enable=False):
-        '''Connect trig=machine.Pin(#) to SR-04 trigger and echo to SR-04 echo'''
+        #'''Connect trig=machine.Pin(#) to SR-04 trigger and echo to SR-04 echo'''
         self.trig = trig
         self.echo = echo
     def enable(self):
@@ -29,7 +29,7 @@ class sr04:
             # edge has risen, start the clock
             self.mailslot=0
             self.lastup = now
-        else
+        else:
             self.mailslot = utime.ticks_diff(now, self.lastup)
 
 
