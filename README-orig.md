@@ -1,27 +1,14 @@
-Joe's fork of Micropython
-=======================
-It seems that the Micropython project has bifurcated of late (since about 
-2016 as far as I can tell).  There have apparently been personality conflicts
-between original and active developers, commercial spin-offs for different
-boards or user bases, and lots of developments in the "Real" Python language
-as well.
-
-This space focuses on helping me to understand where Micropython is, which
-branches/forks/libraries/boards/repositories are usable, and how they compare,
-and most importantly, it's a place I use as a source for building Micropython
-for my microcontroller boards.
-
-I would rather not take sides among the people or businesses that have brought
-Micropython to where it is today.  I have a great deal of respect for those 
-who are better programmers than I am, and there has been some amazing work
-done here.
-
-The original project README is at [README-orig.md].  Parts are reproduced below:
+[![Build Status](https://travis-ci.org/micropython/micropython.png?branch=master)](https://travis-ci.org/micropython/micropython) [![Coverage Status](https://coveralls.io/repos/micropython/micropython/badge.png?branch=master)](https://coveralls.io/r/micropython/micropython?branch=master)
 
 The MicroPython project
 =======================
+<p align="center">
+  <img src="https://raw.githubusercontent.com/micropython/micropython/master/logo/upython-with-micro.jpg" alt="MicroPython Logo"/>
+</p>
+
 This is the MicroPython project, which aims to put an implementation
 of Python 3.x on microcontrollers and small embedded systems.
+You can find the official website at [micropython.org](http://www.micropython.org).
 
 WARNING: this project is in beta stage and is subject to changes of the
 code-base, including project-wide name changes and API changes.
@@ -38,6 +25,9 @@ Python 3 functionality is implemented for the data types and modules.
 MicroPython can execute scripts in textual source form or from precompiled
 bytecode, in both cases either from an on-device filesystem or "frozen" into
 the MicroPython executable.
+
+See the repository http://github.com/micropython/pyboard for the MicroPython
+board (PyBoard), the officially supported reference electronic circuit board.
 
 Major components in this repository:
 - py/ -- the core Python implementation, including compiler, runtime, and
@@ -176,8 +166,9 @@ See the README.md file in the ports/stm32/ directory for further details.
 Contributing
 ------------
 
-I welcome contributions, and I'm certain that I will make mistakes that do
-not originate from the upstream sources.  I welcome your contributions.
-
+MicroPython is an open-source project and welcomes contributions. To be
+productive, please be sure to follow the
+[Contributors' Guidelines](https://github.com/micropython/micropython/wiki/ContributorGuidelines)
+and the [Code Conventions](https://github.com/micropython/micropython/blob/master/CODECONVENTIONS.md).
 Note that MicroPython is licenced under the MIT license, and all contributions
 should follow this license.
