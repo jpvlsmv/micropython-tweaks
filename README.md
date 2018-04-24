@@ -16,6 +16,14 @@ Micropython to where it is today.  I have a great deal of respect for those
 who are better programmers than I am, and there has been some amazing work
 done here.
 
+Sources
+=======================
+https://github.com/micropython/micropython - The original upstream
+https://github.com/pfalcon/micropython - Includes some library features not
+available in upstream, but introduces some changes
+https://github.com/adafruit/circuitpython - Flavor by Adafruit, easier to use
+with their boards
+
 The original project README is at [README-orig.md].  Parts are reproduced below:
 
 The MicroPython project
