@@ -29,8 +29,10 @@
 #include <stdarg.h>
 
 #include "py/objtuple.h"
+#include "py/objarray.h"
 #include "py/runtime.h"
 #include "py/gc.h"
+#include "py/binary.h"
 #include "py/stream.h"
 #include "py/mperrno.h"
 #include "py/mphal.h"
@@ -102,31 +104,26 @@ STATIC uint8_t can2_start_bank = 14;
 // assumes Init parameters have been set up correctly
 STATIC bool can_init(pyb_can_obj_t *can_obj) {
     CAN_TypeDef *CANx = NULL;
-
-    uint32_t GPIO_Pin = 0;
-    uint8_t  GPIO_AF_CANx = 0;
-    GPIO_TypeDef* GPIO_Port = NULL;
     uint32_t sce_irq = 0;
+    const pin_obj_t *pins[2];
 
     switch (can_obj->can_id) {
-        // CAN1 is on RX,TX = Y3,Y4 = PB9,PB9
+        #if defined(MICROPY_HW_CAN1_TX)
         case PYB_CAN_1:
             CANx = CAN1;
-            GPIO_AF_CANx = GPIO_AF9_CAN1;
-            GPIO_Port = GPIOB;
-            GPIO_Pin = GPIO_PIN_8 | GPIO_PIN_9;
             sce_irq = CAN1_SCE_IRQn;
+            pins[0] = MICROPY_HW_CAN1_TX;
+            pins[1] = MICROPY_HW_CAN1_RX;
             __CAN1_CLK_ENABLE();
             break;
+        #endif
 
-        #if defined(CAN2)
-        // CAN2 is on RX,TX = Y5,Y6 = PB12,PB13
+        #if defined(MICROPY_HW_CAN2_TX)
         case PYB_CAN_2:
             CANx = CAN2;
-            GPIO_AF_CANx = GPIO_AF9_CAN2;
-            GPIO_Port = GPIOB;
-            GPIO_Pin = GPIO_PIN_12 | GPIO_PIN_13;
             sce_irq = CAN2_SCE_IRQn;
+            pins[0] = MICROPY_HW_CAN2_TX;
+            pins[1] = MICROPY_HW_CAN2_RX;
             __CAN1_CLK_ENABLE(); // CAN2 is a "slave" and needs CAN1 enabled as well
             __CAN2_CLK_ENABLE();
             break;
@@ -137,13 +134,13 @@ STATIC bool can_init(pyb_can_obj_t *can_obj) {
     }
 
     // init GPIO
-    GPIO_InitTypeDef GPIO_InitStructure;
-    GPIO_InitStructure.Pin = GPIO_Pin;
-    GPIO_InitStructure.Speed = GPIO_SPEED_FREQ_VERY_HIGH;
-    GPIO_InitStructure.Mode = GPIO_MODE_AF_PP;
-    GPIO_InitStructure.Pull = GPIO_PULLUP;
-    GPIO_InitStructure.Alternate = GPIO_AF_CANx;
-    HAL_GPIO_Init(GPIO_Port, &GPIO_InitStructure);
+    uint32_t mode = MP_HAL_PIN_MODE_ALT;
+    uint32_t pull = MP_HAL_PIN_PULL_UP;
+    for (int i = 0; i < 2; i++) {
+        if (!mp_hal_pin_config_alt(pins[i], mode, pull, AF_FN_CAN, can_obj->can_id)) {
+            return false;
+        }
+    }
 
     // init CANx
     can_obj->can.Instance = CANx;
@@ -156,7 +153,7 @@ STATIC bool can_init(pyb_can_obj_t *can_obj) {
 
     __HAL_CAN_ENABLE_IT(&can_obj->can, CAN_IT_ERR | CAN_IT_BOF | CAN_IT_EPV | CAN_IT_EWG);
 
-    HAL_NVIC_SetPriority(sce_irq, IRQ_PRI_CAN, IRQ_SUBPRI_CAN);
+    NVIC_SetPriority(sce_irq, IRQ_PRI_CAN);
     HAL_NVIC_EnableIRQ(sce_irq);
 
     return true;
@@ -645,18 +642,20 @@ STATIC mp_obj_t pyb_can_send(size_t n_args, const mp_obj_t *pos_args, mp_map_t *
 }
 STATIC MP_DEFINE_CONST_FUN_OBJ_KW(pyb_can_send_obj, 1, pyb_can_send);
 
-/// \method recv(fifo, *, timeout=5000)
+/// \method recv(fifo, list=None, *, timeout=5000)
 ///
 /// Receive data on the bus:
 ///
 ///   - `fifo` is an integer, which is the FIFO to receive on
+///   - `list` if not None is a list with at least 4 elements
 ///   - `timeout` is the timeout in milliseconds to wait for the receive.
 ///
 /// Return value: buffer of data bytes.
 STATIC mp_obj_t pyb_can_recv(size_t n_args, const mp_obj_t *pos_args, mp_map_t *kw_args) {
-    enum { ARG_fifo, ARG_timeout };
+    enum { ARG_fifo, ARG_list, ARG_timeout };
     static const mp_arg_t allowed_args[] = {
         { MP_QSTR_fifo,    MP_ARG_REQUIRED | MP_ARG_INT, {.u_int = 0} },
+        { MP_QSTR_list,    MP_ARG_OBJ, {.u_obj = mp_const_none} },
         { MP_QSTR_timeout, MP_ARG_KW_ONLY | MP_ARG_INT, {.u_int = 5000} },
     };
 
@@ -700,23 +699,49 @@ STATIC mp_obj_t pyb_can_recv(size_t n_args, const mp_obj_t *pos_args, mp_map_t *
         }
     }
 
-    // return the received data
-    // TODO use a namedtuple (when namedtuple types can be stored in ROM)
-    mp_obj_tuple_t *tuple = mp_obj_new_tuple(4, NULL);
-    if (rx_msg.IDE == CAN_ID_STD) {
-        tuple->items[0] = MP_OBJ_NEW_SMALL_INT(rx_msg.StdId);
+    // Create the tuple, or get the list, that will hold the return values
+    // Also populate the fourth element, either a new bytes or reuse existing memoryview
+    mp_obj_t ret_obj = args[ARG_list].u_obj;
+    mp_obj_t *items;
+    if (ret_obj == mp_const_none) {
+        ret_obj = mp_obj_new_tuple(4, NULL);
+        items = ((mp_obj_tuple_t*)MP_OBJ_TO_PTR(ret_obj))->items;
+        items[3] = mp_obj_new_bytes(&rx_msg.Data[0], rx_msg.DLC);
     } else {
-        tuple->items[0] = MP_OBJ_NEW_SMALL_INT(rx_msg.ExtId);
+        // User should provide a list of length at least 4 to hold the values
+        if (!MP_OBJ_IS_TYPE(ret_obj, &mp_type_list)) {
+            mp_raise_TypeError(NULL);
+        }
+        mp_obj_list_t *list = MP_OBJ_TO_PTR(ret_obj);
+        if (list->len < 4) {
+            mp_raise_ValueError(NULL);
+        }
+        items = list->items;
+        // Fourth element must be a memoryview which we assume points to a
+        // byte-like array which is large enough, and then we resize it inplace
+        if (!MP_OBJ_IS_TYPE(items[3], &mp_type_memoryview)) {
+            mp_raise_TypeError(NULL);
+        }
+        mp_obj_array_t *mv = MP_OBJ_TO_PTR(items[3]);
+        if (!(mv->typecode == (0x80 | BYTEARRAY_TYPECODE)
+            || (mv->typecode | 0x20) == (0x80 | 'b'))) {
+            mp_raise_ValueError(NULL);
+        }
+        mv->len = rx_msg.DLC;
+        memcpy(mv->items, &rx_msg.Data[0], rx_msg.DLC);
     }
-    tuple->items[1] = rx_msg.RTR == CAN_RTR_REMOTE ? mp_const_true : mp_const_false;
-    tuple->items[2] = MP_OBJ_NEW_SMALL_INT(rx_msg.FMI);
-    vstr_t vstr;
-    vstr_init_len(&vstr, rx_msg.DLC);
-    for (mp_uint_t i = 0; i < rx_msg.DLC; i++) {
-        vstr.buf[i] = rx_msg.Data[i]; // Data is uint32_t but holds only 1 byte
+
+    // Populate the first 3 values of the tuple/list
+    if (rx_msg.IDE == CAN_ID_STD) {
+        items[0] = MP_OBJ_NEW_SMALL_INT(rx_msg.StdId);
+    } else {
+        items[0] = MP_OBJ_NEW_SMALL_INT(rx_msg.ExtId);
     }
-    tuple->items[3] = mp_obj_new_str_from_vstr(&mp_type_bytes, &vstr);
-    return tuple;
+    items[1] = rx_msg.RTR == CAN_RTR_REMOTE ? mp_const_true : mp_const_false;
+    items[2] = MP_OBJ_NEW_SMALL_INT(rx_msg.FMI);
+
+    // Return the result
+    return ret_obj;
 }
 STATIC MP_DEFINE_CONST_FUN_OBJ_KW(pyb_can_recv_obj, 1, pyb_can_recv);
 
@@ -909,7 +934,7 @@ STATIC mp_obj_t pyb_can_rxcallback(mp_obj_t self_in, mp_obj_t fifo_in, mp_obj_t 
             irq = (fifo == 0) ? CAN2_RX0_IRQn : CAN2_RX1_IRQn;
         #endif
         }
-        HAL_NVIC_SetPriority(irq, IRQ_PRI_CAN, IRQ_SUBPRI_CAN);
+        NVIC_SetPriority(irq, IRQ_PRI_CAN);
         HAL_NVIC_EnableIRQ(irq);
         __HAL_CAN_ENABLE_IT(&self->can, (fifo == 0) ? CAN_IT_FMP0 : CAN_IT_FMP1);
         __HAL_CAN_ENABLE_IT(&self->can, (fifo == 0) ? CAN_IT_FF0  : CAN_IT_FF1);
