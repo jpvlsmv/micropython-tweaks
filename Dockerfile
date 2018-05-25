@@ -18,13 +18,13 @@ WORKDIR /data/esp-open-sdk
 RUN make
 ENV PATH="/data/esp-open-sdk/xtensa-lx106-elf/bin:$PATH"
 
-WORKDIR /data/micropython/ 
+WORKDIR /data/micropython/
 RUN git submodule update --init
 RUN git merge --theirs /data/micropython-tweaks
 RUN make -C mpy-cross
 
 WORKDIR /data/micropython/ports/esp8266
-RUN make axtls && make 
+RUN make axtls && make
 
 COPY docker-interactive-entry.sh /usr/bin/
 ENTRYPOINT ["/usr/bin/docker-interactive-entry.sh"]
