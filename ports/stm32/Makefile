@@ -184,6 +184,7 @@ SRC_LIBM = $(addprefix lib/libm/,\
 endif
 
 EXTMOD_SRC_C = $(addprefix extmod/,\
+	modlwip.c \
 	modonewire.c \
         )
 
@@ -217,6 +218,7 @@ SRC_C = \
 	bufhelper.c \
 	dma.c \
 	i2c.c \
+	pyb_i2c.c \
 	spi.c \
 	qspi.c \
 	uart.c \
@@ -336,6 +338,47 @@ SRC_MOD += $(addprefix $(CC3000_DIR)/src/,\
 	)
 endif
 
+LWIP_DIR = lib/lwip/src
+INC += -I$(TOP)/$(LWIP_DIR)/include -Ilwip_inc
+$(BUILD)/$(LWIP_DIR)/core/ipv4/dhcp.o: CFLAGS += -Wno-address
+SRC_MOD += $(addprefix $(LWIP_DIR)/,\
+	core/def.c \
+	core/dns.c \
+	core/inet_chksum.c \
+	core/init.c \
+	core/ip.c \
+	core/mem.c \
+	core/memp.c \
+	core/netif.c \
+	core/pbuf.c \
+	core/raw.c \
+	core/stats.c \
+	core/sys.c \
+	core/tcp.c \
+	core/tcp_in.c \
+	core/tcp_out.c \
+	core/timeouts.c \
+	core/udp.c \
+	core/ipv4/autoip.c \
+	core/ipv4/dhcp.c \
+	core/ipv4/etharp.c \
+	core/ipv4/icmp.c \
+	core/ipv4/igmp.c \
+	core/ipv4/ip4_addr.c \
+	core/ipv4/ip4.c \
+	core/ipv4/ip4_frag.c \
+	core/ipv6/dhcp6.c \
+	core/ipv6/ethip6.c \
+	core/ipv6/icmp6.c \
+	core/ipv6/inet6.c \
+	core/ipv6/ip6_addr.c \
+	core/ipv6/ip6.c \
+	core/ipv6/ip6_frag.c \
+	core/ipv6/mld6.c \
+	core/ipv6/nd6.c \
+	netif/ethernet.c \
+	)
+
 OBJ =
 OBJ += $(PY_O)
 OBJ += $(addprefix $(BUILD)/, $(SRC_LIB:.c=.o))
@@ -348,6 +391,11 @@ OBJ += $(addprefix $(BUILD)/, $(SRC_HAL:.c=.o))
 OBJ += $(addprefix $(BUILD)/, $(SRC_USBDEV:.c=.o))
 OBJ += $(addprefix $(BUILD)/, $(SRC_MOD:.c=.o))
 OBJ += $(BUILD)/pins_$(BOARD).o
+
+# This file contains performance critical functions so turn up the optimisation
+# level.  It doesn't add much to the code size and improves performance a bit.
+# Don't use -O3 with this file because gcc tries to optimise memset in terms of itself.
+$(BUILD)/lib/libc/string0.o: COPT += -O2
 
 # We put several files into the first 16K section with the ISRs.
 # If we compile these using -O0 then it won't fit. So if you really want these
